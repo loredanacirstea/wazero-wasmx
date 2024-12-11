@@ -3,10 +3,12 @@ package wazero
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -98,6 +100,8 @@ type Runtime interface {
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, binary []byte) (CompiledModule, error)
+
+	CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error)
 
 	// InstantiateModule instantiates the module or errs for reasons including
 	// exit or validation.
@@ -377,4 +381,53 @@ func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error 
 		}
 	}
 	return err
+}
+
+func (r *runtime) EnableDeterministicCompilation(enable bool) {
+	wazevoapi.DeterministicCompilationVerifierEnabled = enable
+}
+
+// func (r *runtime) DeserializeCompiledModule(reader io.ReadCloser) {
+
+// }
+
+// CompileModule implements Runtime.CompileModule
+func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, nil, err
+	}
+
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
+	if err != nil {
+		return nil, nil, err
+	} else if err = internal.Validate(r.enabledFeatures); err != nil {
+		// TODO: decoders should validate before returning, as that allows
+		// them to err with the correct position in the wasm binary.
+		return nil, nil, err
+	}
+
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
+	internal.BuildMemoryDefinitions()
+
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	// typeIDs are static and compile-time known.
+	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
+	if err != nil {
+		return nil, nil, err
+	}
+	c.typeIDs = typeIDs
+
+	listeners, err := buildFunctionListeners(ctx, internal)
+	if err != nil {
+		return nil, nil, err
+	}
+	internal.AssignModuleID(binary, listeners, r.ensureTermination)
+	if reader, err = r.store.Engine.CompileModuleAndSerialize(ctx, internal, listeners, r.ensureTermination); err != nil {
+		return nil, nil, err
+	}
+	return c, reader, nil
+
 }

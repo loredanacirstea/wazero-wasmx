@@ -301,3 +301,11 @@ func readUint64(reader io.Reader, b *[8]byte) (uint64, error) {
 	ret := binary.LittleEndian.Uint64(s)
 	return ret, nil
 }
+
+func (e *engine) SerializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader {
+	return serializeCompiledModule(wazeroVersion, cm)
+}
+
+func (e *engine) DeserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
+	return deserializeCompiledModule(wazeroVersion, reader)
+}

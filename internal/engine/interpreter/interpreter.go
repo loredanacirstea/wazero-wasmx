@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/bits"
 	"sync"
@@ -396,6 +397,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	}
 	e.addCompiledFunctions(module, funcs)
 	return nil
+}
+
+func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.

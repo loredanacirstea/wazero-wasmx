@@ -79,7 +79,7 @@ func CheckStackGuardPage(s []byte) {
 
 // ----- Deterministic compilation verifier -----
 
-const (
+var (
 	// DeterministicCompilationVerifierEnabled enables the deterministic compilation verifier. This is disabled by default
 	// since the operation is expensive. But when in doubt, enable this to make sure the compilation is deterministic.
 	DeterministicCompilationVerifierEnabled = false
@@ -167,7 +167,7 @@ This is mostly due to (but might not be limited to):
 }
 
 // nolint
-const NeedFunctionNameInContext = PrintSSA ||
+var NeedFunctionNameInContext = PrintSSA ||
 	PrintOptimizedSSA ||
 	PrintSSAToBackendIRLowering ||
 	PrintRegisterAllocated ||

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+	"io"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
@@ -15,6 +16,7 @@ type Engine interface {
 
 	// CompileModule implements the same method as documented on wasm.Engine.
 	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTermination bool) error
+	CompileModuleAndSerialize(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error)
 
 	// CompiledModuleCount is exported for testing, to track the size of the compilation cache.
 	CompiledModuleCount() uint32

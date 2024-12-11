@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"sort"
 	"sync"
@@ -840,4 +841,52 @@ func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
 		return 0
 	}
 	return cm.sourceMap.wasmBinaryOffsets[index]
+}
+
+// CompileModule implements wasm.Engine.
+func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error) {
+	if wazevoapi.PerfMapEnabled {
+		wazevoapi.PerfMap.Lock()
+		defer wazevoapi.PerfMap.Unlock()
+	}
+
+	if _, ok, err := e.getCompiledModule(module, listeners, ensureTermination); ok { // cache hit!
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
+	}
+	cm, err := e.compileModule(ctx, module, listeners, ensureTermination)
+	if err != nil {
+		return nil, err
+	}
+	if err = e.addCompiledModule(module, cm); err != nil {
+		return nil, err
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
+			_, err := e.compileModule(ctx, module, listeners, ensureTermination)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(listeners) > 0 {
+		cm.listeners = listeners
+		cm.listenerBeforeTrampolines = make([]*byte, len(module.TypeSection))
+		cm.listenerAfterTrampolines = make([]*byte, len(module.TypeSection))
+		for i := range module.TypeSection {
+			typ := &module.TypeSection[i]
+			before, after := e.getListenerTrampolineForType(typ)
+			cm.listenerBeforeTrampolines[i] = before
+			cm.listenerAfterTrampolines[i] = after
+		}
+	}
+	serialized := e.SerializeCompiledModule(e.wazeroVersion, cm)
+	return serialized, nil
 }
