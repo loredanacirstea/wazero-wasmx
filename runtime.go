@@ -103,6 +103,9 @@ type Runtime interface {
 
 	CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error)
 
+	// DeserializeCompiledModule(ctx context.Context, content io.ReadCloser) (CompiledModule, error)
+	DeserializeCompiledModule(ctx context.Context, wasmbinary []byte, content io.ReadCloser) (CompiledModule, error)
+
 	// InstantiateModule instantiates the module or errs for reasons including
 	// exit or validation.
 	//
@@ -430,4 +433,97 @@ func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte) 
 	}
 	return c, reader, nil
 
+}
+
+// DeserializeCompiledModule takes a serialized compiled module and prepares it for instantiation.
+func (r *runtime) DeserializeCompiledModule(ctx context.Context, binary []byte, content io.ReadCloser) (CompiledModule, error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
+	if err != nil {
+		return nil, err
+	} else if err = internal.Validate(r.enabledFeatures); err != nil {
+		// TODO: decoders should validate before returning, as that allows
+		// them to err with the correct position in the wasm binary.
+		return nil, err
+	}
+
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
+	internal.BuildMemoryDefinitions()
+
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	// typeIDs are static and compile-time known.
+	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+	c.typeIDs = typeIDs
+
+	listeners, err := buildFunctionListeners(ctx, internal)
+	if err != nil {
+		return nil, err
+	}
+	internal.AssignModuleID(binary, listeners, r.ensureTermination)
+
+	// Deserialize and store the compiled module in the engine's state
+	_, staleCache, err := r.store.Engine.DeserializeModule(ctx, internal, content, listeners, r.ensureTermination)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize compiled module: %w", err)
+	}
+	if staleCache {
+		return nil, fmt.Errorf("compiled module was created with an incompatible wazero version")
+	}
+
+	// Return a compiledModule that can be used for instantiation
+	return &compiledModule{
+		module:         internal,
+		compiledEngine: r.store.Engine,
+		typeIDs:        typeIDs,
+	}, nil
+}
+
+// CompileModule implements Runtime.CompileModule
+func (r *runtime) compileModuleShallow(ctx context.Context, binary []byte) (CompiledModule, error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
+	if err != nil {
+		return nil, err
+	} else if err = internal.Validate(r.enabledFeatures); err != nil {
+		// TODO: decoders should validate before returning, as that allows
+		// them to err with the correct position in the wasm binary.
+		return nil, err
+	}
+
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
+	internal.BuildMemoryDefinitions()
+
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	// typeIDs are static and compile-time known.
+	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+	c.typeIDs = typeIDs
+
+	listeners, err := buildFunctionListeners(ctx, internal)
+	if err != nil {
+		return nil, err
+	}
+	internal.AssignModuleID(binary, listeners, r.ensureTermination)
+	return c, nil
 }

@@ -306,6 +306,36 @@ func (e *engine) SerializeCompiledModule(wazeroVersion string, cm *compiledModul
 	return serializeCompiledModule(wazeroVersion, cm)
 }
 
-func (e *engine) DeserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
-	return deserializeCompiledModule(wazeroVersion, reader)
+func (e *engine) DeserializeCompiledModule(wazeroVersion string, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (cm *compiledModule, staleCache bool, err error) {
+	cm, staleCache, err = deserializeCompiledModule(wazeroVersion, reader)
+	if staleCache {
+		return nil, true, nil
+	}
+	// taken from getCompiledModule
+	cm.parent = e
+	cm.module = module
+	cm.sharedFunctions = e.sharedFunctions
+	cm.ensureTermination = ensureTermination
+	cm.offsets = wazevoapi.NewModuleContextOffsetData(module, len(listeners) > 0)
+	if len(listeners) > 0 {
+		cm.listeners = listeners
+		cm.listenerBeforeTrampolines = make([]*byte, len(module.TypeSection))
+		cm.listenerAfterTrampolines = make([]*byte, len(module.TypeSection))
+		for i := range module.TypeSection {
+			typ := &module.TypeSection[i]
+			before, after := e.getListenerTrampolineForType(typ)
+			cm.listenerBeforeTrampolines[i] = before
+			cm.listenerAfterTrampolines[i] = after
+		}
+	}
+	e.addCompiledModuleToMemory(module, cm)
+	ssaBuilder := ssa.NewBuilder()
+	machine := newMachine()
+	be := backend.NewCompiler(context.Background(), machine, ssaBuilder)
+	cm.executables.compileEntryPreambles(module, machine, be)
+
+	// Set the finalizer.
+	e.setFinalizer(cm.executables, executablesFinalizer)
+
+	return
 }

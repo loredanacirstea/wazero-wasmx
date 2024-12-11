@@ -17,6 +17,7 @@ type Engine interface {
 	// CompileModule implements the same method as documented on wasm.Engine.
 	CompileModule(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTermination bool) error
 	CompileModuleAndSerialize(ctx context.Context, module *Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error)
+	DeserializeModule(ctx context.Context, module *Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (cm *Module, staleCache bool, err error)
 
 	// CompiledModuleCount is exported for testing, to track the size of the compilation cache.
 	CompiledModuleCount() uint32
