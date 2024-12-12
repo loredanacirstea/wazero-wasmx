@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
@@ -390,9 +391,9 @@ func (r *runtime) EnableDeterministicCompilation(enable bool) {
 	wazevoapi.DeterministicCompilationVerifierEnabled = enable
 }
 
-// func (r *runtime) DeserializeCompiledModule(reader io.ReadCloser) {
-
-// }
+func Version() string {
+	return version.GetWazeroVersion()
+}
 
 // CompileModule implements Runtime.CompileModule
 func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error) {
