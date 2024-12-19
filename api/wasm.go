@@ -390,6 +390,9 @@ type Function interface {
 	// the end-to-end demonstrations of how these terminations can be performed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 
+	WithGasMeter(meter GasMeter) Function
+	GasMeter() GasMeter
+
 	// CallWithStack is an optimized variation of Call that saves memory
 	// allocations when the stack slice is reused across calls.
 	//

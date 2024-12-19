@@ -527,6 +527,14 @@ func (ce *mockCallEngine) CallWithStack(_ context.Context, _ []uint64) error {
 	return nil
 }
 
+func (ce *mockCallEngine) WithGasMeter(meter api.GasMeter) api.Function {
+	return ce
+}
+
+func (ce *mockCallEngine) GasMeter() api.GasMeter {
+	return nil
+}
+
 func TestStore_getFunctionTypeID(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := newStore()

@@ -71,3 +71,11 @@ func (l *lookedUpGoFunction) CallWithStack(ctx context.Context, stack []uint64) 
 	l.g.Call(ctx, l.lookedUpModule, stack)
 	return nil
 }
+
+func (l *lookedUpGoFunction) WithGasMeter(meter api.GasMeter) api.Function {
+	return l
+}
+
+func (l *lookedUpGoFunction) GasMeter() api.GasMeter {
+	return nil
+}

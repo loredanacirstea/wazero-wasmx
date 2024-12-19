@@ -43,6 +43,7 @@ type (
 		execCtxPtr        uintptr
 		numberOfResults   int
 		stackIteratorImpl stackIterator
+		gasMeter          api.GasMeter
 	}
 
 	// executionContext is the struct to be read/written by assembly functions.
@@ -129,6 +130,15 @@ func alignedStackTop(s []byte) uintptr {
 // Definition implements api.Function.
 func (c *callEngine) Definition() api.FunctionDefinition {
 	return c.parent.module.Source.FunctionDefinition(c.indexInModule)
+}
+
+func (ce *callEngine) WithGasMeter(meter api.GasMeter) api.Function {
+	ce.gasMeter = meter
+	return ce
+}
+
+func (ce *callEngine) GasMeter() api.GasMeter {
+	return ce.gasMeter
 }
 
 // Call implements api.Function.

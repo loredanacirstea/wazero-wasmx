@@ -121,6 +121,8 @@ type callEngine struct {
 
 	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
+	// gasConfig     GasConfig
+	gasMeter api.GasMeter
 }
 
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
@@ -547,6 +549,15 @@ func (f *function) definition() api.FunctionDefinition {
 	return compiled.source.FunctionDefinition(compiled.index)
 }
 
+func (ce *callEngine) WithGasMeter(meter api.GasMeter) api.Function {
+	ce.gasMeter = meter
+	return ce
+}
+
+func (ce *callEngine) GasMeter() api.GasMeter {
+	return ce.gasMeter
+}
+
 // Call implements the same method as documented on api.Function.
 func (ce *callEngine) Call(ctx context.Context, params ...uint64) (results []uint64, err error) {
 	ft := ce.f.funcType
@@ -567,6 +578,9 @@ func (ce *callEngine) CallWithStack(ctx context.Context, stack []uint64) error {
 }
 
 func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []uint64, err error) {
+	if ce.gasMeter == nil {
+		ce.gasMeter = &api.GasMeterNoOp{}
+	}
 	m := ce.f.moduleInstance
 	if ce.f.parent.ensureTermination {
 		select {
@@ -719,6 +733,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	bodyLen := uint64(len(body))
 	for frame.pc < bodyLen {
 		op := &body[frame.pc]
+		ce.gasMeter.ConsumeGas(1, "wasm operation")
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.

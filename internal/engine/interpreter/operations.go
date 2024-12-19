@@ -857,6 +857,7 @@ type unionOperation struct {
 	U1, U2 uint64
 	U3     uint64
 	Us     []uint64
+	Gas    uint64 // Gas cost for this operation
 }
 
 // String implements fmt.Stringer.
@@ -1289,7 +1290,7 @@ type memoryArg struct {
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise load the corresponding value following the semantics of the corresponding WebAssembly instruction.
 func newOperationLoad(unsignedType unsignedType, arg memoryArg) unionOperation {
-	return unionOperation{Kind: operationKindLoad, B1: byte(unsignedType), U1: uint64(arg.Alignment), U2: uint64(arg.Offset)}
+	return unionOperation{Kind: operationKindLoad, B1: byte(unsignedType), U1: uint64(arg.Alignment), U2: uint64(arg.Offset), Gas: 1}
 }
 
 // NewOperationLoad8 is a constructor for unionOperation with operationKindLoad8.
