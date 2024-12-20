@@ -102,7 +102,8 @@ type Runtime interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, binary []byte) (CompiledModule, error)
 
-	CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error)
+	CompileModuleWithMetering(ctx context.Context, binary []byte) (CompiledModule, error)
+	CompileModuleAndSerialize(ctx context.Context, binary []byte, meteringEnabled bool) (_ CompiledModule, reader io.Reader, err error)
 
 	// DeserializeCompiledModule(ctx context.Context, content io.ReadCloser) (CompiledModule, error)
 	DeserializeCompiledModule(ctx context.Context, wasmbinary []byte, content io.ReadCloser) (CompiledModule, error)
@@ -248,7 +249,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, err
 	}
 	internal.AssignModuleID(binary, listeners, r.ensureTermination)
-	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination, false); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -395,8 +396,47 @@ func Version() string {
 	return version.GetWazeroVersion()
 }
 
+func (r *runtime) CompileModuleWithMetering(ctx context.Context, binary []byte) (CompiledModule, error) {
+	if err := r.failIfClosed(); err != nil {
+		return nil, err
+	}
+
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, r.storeCustomSections)
+	if err != nil {
+		return nil, err
+	} else if err = internal.Validate(r.enabledFeatures); err != nil {
+		// TODO: decoders should validate before returning, as that allows
+		// them to err with the correct position in the wasm binary.
+		return nil, err
+	}
+
+	// Now that the module is validated, cache the memory definitions.
+	// TODO: lazy initialization of memory definition.
+	internal.BuildMemoryDefinitions()
+
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	// typeIDs are static and compile-time known.
+	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+	c.typeIDs = typeIDs
+
+	listeners, err := buildFunctionListeners(ctx, internal)
+	if err != nil {
+		return nil, err
+	}
+	internal.AssignModuleID(binary, listeners, r.ensureTermination)
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination, true); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte) (_ CompiledModule, reader io.Reader, err error) {
+func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte, meteringEnabled bool) (_ CompiledModule, reader io.Reader, err error) {
 	if err := r.failIfClosed(); err != nil {
 		return nil, nil, err
 	}
@@ -429,7 +469,7 @@ func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte) 
 		return nil, nil, err
 	}
 	internal.AssignModuleID(binary, listeners, r.ensureTermination)
-	if reader, err = r.store.Engine.CompileModuleAndSerialize(ctx, internal, listeners, r.ensureTermination); err != nil {
+	if reader, err = r.store.Engine.CompileModuleAndSerialize(ctx, internal, listeners, r.ensureTermination, meteringEnabled); err != nil {
 		return nil, nil, err
 	}
 	return c, reader, nil

@@ -2327,7 +2327,7 @@ L2 (SSA Block: blk2):
 
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, false)
-			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false, false)
+			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false, false, false)
 			machine := newMachine()
 			machine.DisableStackCheck()
 			be := backend.NewCompiler(context.Background(), machine, ssab)

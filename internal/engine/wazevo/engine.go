@@ -118,7 +118,7 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm
 }
 
 // CompileModule implements wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (err error) {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) (err error) {
 	if wazevoapi.PerfMapEnabled {
 		wazevoapi.PerfMap.Lock()
 		defer wazevoapi.PerfMap.Unlock()
@@ -133,7 +133,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
 	}
-	cm, err := e.compileModule(ctx, module, listeners, ensureTermination)
+	cm, err := e.compileModule(ctx, module, listeners, ensureTermination, meteringEnabled)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
-			_, err := e.compileModule(ctx, module, listeners, ensureTermination)
+			_, err := e.compileModule(ctx, module, listeners, ensureTermination, meteringEnabled)
 			if err != nil {
 				return err
 			}
@@ -181,7 +181,7 @@ func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.M
 	}
 }
 
-func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
+func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) (*compiledModule, error) {
 	withListener := len(listeners) > 0
 	cm := &compiledModule{
 		offsets: wazevoapi.NewModuleContextOffsetData(module, withListener), parent: e, module: module,
@@ -210,7 +210,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo, meteringEnabled)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
@@ -844,7 +844,7 @@ func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
 }
 
 // CompileModule implements wasm.Engine.
-func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error) {
+func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) (reader io.Reader, err error) {
 	if wazevoapi.PerfMapEnabled {
 		wazevoapi.PerfMap.Lock()
 		defer wazevoapi.PerfMap.Unlock()
@@ -859,7 +859,7 @@ func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Mod
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
 	}
-	cm, err := e.compileModule(ctx, module, listeners, ensureTermination)
+	cm, err := e.compileModule(ctx, module, listeners, ensureTermination, meteringEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -869,7 +869,7 @@ func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Mod
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
-			_, err := e.compileModule(ctx, module, listeners, ensureTermination)
+			_, err := e.compileModule(ctx, module, listeners, ensureTermination, meteringEnabled)
 			if err != nil {
 				return nil, err
 			}

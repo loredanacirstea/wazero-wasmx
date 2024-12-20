@@ -66,12 +66,7 @@ type Compiler struct {
 
 	pointers []int
 	bounds   [][]knownSafeBoundWithID
-
-	// // Gas metering related fields
-	// gasLimitOffset uint32        // Offset in execution context where gas limit is stored
-	// gasUsedOffset  uint32        // Offset in execution context where gas used is stored
-	// outOfGasSig    ssa.Signature // Signature for out of gas handler
-
+	metering bool
 }
 
 type (
@@ -93,7 +88,7 @@ type (
 var knownSafeBoundsAtTheEndOfBlockNil = wazevoapi.NewNilVarLength[knownSafeBoundWithID]()
 
 // NewFrontendCompiler returns a frontend Compiler.
-func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool) *Compiler {
+func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool, metering bool) *Compiler {
 	c := &Compiler{
 		m:                                 m,
 		ssaBuilder:                        ssaBuilder,
@@ -102,6 +97,7 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		ensureTermination:                 ensureTermination,
 		needSourceOffsetInfo:              sourceInfo,
 		varLengthKnownSafeBoundWithIDPool: wazevoapi.NewVarLengthPool[knownSafeBoundWithID](),
+		metering:                          metering,
 	}
 	c.declareSignatures(listenerOn)
 	return c

@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -303,7 +304,7 @@ func TestModule_Global(t *testing.T) {
 
 			code := &compiledModule{module: tc.module}
 
-			err := r.store.Engine.CompileModule(testCtx, code.module, nil, false)
+			err := r.store.Engine.CompileModule(testCtx, code.module, nil, false, false)
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above global
@@ -782,9 +783,18 @@ type mockEngine struct {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool) error {
+func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool, _ bool) error {
 	e.cachedModules[module] = struct{}{}
 	return nil
+}
+
+func (e *mockEngine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) (reader io.Reader, err error) {
+	e.cachedModules[module] = struct{}{}
+	return nil, nil
+}
+
+func (e *mockEngine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (cm *wasm.Module, staleCache bool, err error) {
+	return nil, false, nil
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.

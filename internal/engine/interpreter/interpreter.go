@@ -358,7 +358,7 @@ func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) error {
 	if _, ok := e.getCompiledFunctions(module); ok { // cache hit!
 		return nil
 	}
@@ -401,7 +401,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	return nil
 }
 
-func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (reader io.Reader, err error) {
+func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, meteringEnabled bool) (reader io.Reader, err error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

@@ -148,7 +148,9 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.ssaBuilder.Seal(entryBlk)
 
-	c.injectGasMeteringAtFunctionEntry()
+	if c.metering {
+		c.injectGasMeteringAtFunctionEntry()
+	}
 
 	if c.needListener {
 		c.callListenerBefore()
@@ -182,10 +184,10 @@ func (c *Compiler) state() *loweringState {
 func (c *Compiler) lowerCurrentOpcode() {
 	op := c.wasmFunctionBody[c.loweringState.pc]
 
-	// fmt.Println("-wazevo.lowerCurrentOpcode.injectGasMetering-")
-	// Inject gas metering before the instruction
-	c.injectGasMetering(op)
-	// fmt.Println("-wazevo.lowerCurrentOpcode.injectGasMetering END-")
+	if c.metering {
+		// Inject gas metering before the instruction
+		c.injectGasMetering(op)
+	}
 
 	if c.needSourceOffsetInfo {
 		c.ssaBuilder.SetCurrentSourceOffset(
