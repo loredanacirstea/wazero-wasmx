@@ -53,6 +53,10 @@ const (
 	ExecutionContextOffsetMemoryWait32TrampolineAddress Offset = 1160
 	ExecutionContextOffsetMemoryWait64TrampolineAddress Offset = 1168
 	ExecutionContextOffsetMemoryNotifyTrampolineAddress Offset = 1176
+
+	// Gas metering offsets
+	ExecutionContextOffsetGasLimit Offset = 1184
+	ExecutionContextOffsetGasUsed  Offset = 1192
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

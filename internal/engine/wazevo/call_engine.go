@@ -3,6 +3,7 @@ package wazevo
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"runtime"
 	"sync/atomic"
@@ -91,6 +92,11 @@ type (
 		memoryWait64TrampolineAddress *byte
 		// memoryNotifyTrampolineAddress holds the address of the memory_notify trampoline function.
 		memoryNotifyTrampolineAddress *byte
+
+		// // gasLimit holds the maximum amount of gas that can be used during execution
+		gasLimit uint64
+		// gasUsed holds the current amount of gas used during execution
+		gasUsed uint64
 	}
 )
 
@@ -117,6 +123,12 @@ func (c *callEngine) init() {
 	} else {
 		c.execCtx.stackBottomPtr = &c.stack[0]
 	}
+
+	// Initialize gas metering fields
+	zero := uint64(0)
+	c.execCtx.gasLimit = zero // Will be set before each call
+	c.execCtx.gasUsed = zero
+
 	c.execCtxPtr = uintptr(unsafe.Pointer(&c.execCtx))
 }
 
@@ -148,9 +160,26 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	}
 	paramResultSlice := make([]uint64, c.sizeOfParamResultSlice)
 	copy(paramResultSlice, params)
+
+	if c.gasMeter != nil {
+		gasLimit := c.gasMeter.GasLimit()
+		gasUsed := c.gasMeter.GasConsumed()
+
+		c.execCtx.gasLimit = gasLimit
+		c.execCtx.gasUsed = gasUsed
+	} else {
+		gasLimit := uint64(math.MaxUint64)
+		gasUsed := uint64(0)
+		c.execCtx.gasLimit = gasLimit
+		c.execCtx.gasUsed = gasUsed
+	}
 	if err := c.callWithStack(ctx, paramResultSlice); err != nil {
 		return nil, err
 	}
+	if c.gasMeter != nil {
+		c.gasMeter.ConsumeGas(c.execCtx.gasUsed, "wasm execution")
+	}
+
 	return paramResultSlice[:c.numberOfResults], nil
 }
 
@@ -233,6 +262,9 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 	}
 	defer func() {
 		r := recover()
+		if c.gasMeter != nil {
+			c.gasMeter.ConsumeGas(c.execCtx.gasUsed, "wasm execution")
+		}
 		if s, ok := r.(*snapshot); ok {
 			// A snapshot that wasn't handled was created by a different call engine possibly from a nested wasm invocation,
 			// let it propagate up to be handled by the caller.
@@ -515,6 +547,8 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 		case wazevoapi.ExitCodeUnalignedAtomic:
 			panic(wasmruntime.ErrRuntimeUnalignedAtomic)
+		case wazevoapi.ExitCodeOutOfGas:
+			panic(wasmruntime.ErrRuntimeOutOfGas)
 		default:
 			panic("BUG")
 		}

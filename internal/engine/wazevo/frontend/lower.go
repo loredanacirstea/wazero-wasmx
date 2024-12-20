@@ -148,6 +148,8 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.ssaBuilder.Seal(entryBlk)
 
+	c.injectGasMeteringAtFunctionEntry()
+
 	if c.needListener {
 		c.callListenerBefore()
 	}
@@ -179,6 +181,11 @@ func (c *Compiler) state() *loweringState {
 
 func (c *Compiler) lowerCurrentOpcode() {
 	op := c.wasmFunctionBody[c.loweringState.pc]
+
+	// fmt.Println("-wazevo.lowerCurrentOpcode.injectGasMetering-")
+	// Inject gas metering before the instruction
+	c.injectGasMetering(op)
+	// fmt.Println("-wazevo.lowerCurrentOpcode.injectGasMetering END-")
 
 	if c.needSourceOffsetInfo {
 		c.ssaBuilder.SetCurrentSourceOffset(
@@ -4257,5 +4264,92 @@ func (c *Compiler) boundsCheckInMemory(memLen, offset, size ssa.Value) {
 		Return()
 	builder.AllocateInstruction().
 		AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeMemoryOutOfBounds).
+		Insert(builder)
+}
+
+// Add gas metering before each instruction
+func (c *Compiler) injectGasMetering(op wasm.Opcode) {
+	if c.loweringState.unreachable {
+		return
+	}
+
+	builder := c.ssaBuilder
+	gasCost := c.getGasCost(op)
+
+	// Debug: Print the opcode and its gas cost
+	// fmt.Printf("wazevo.Metering gas for opcode: %v, cost: %d\n", op, gasCost)
+
+	// Load current gas used
+	gasUsed := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, wazevoapi.ExecutionContextOffsetGasUsed.U32(), ssa.TypeI64).
+		Insert(builder).
+		Return()
+
+	// Add gas cost
+	newGasUsed := builder.AllocateInstruction().
+		AsIadd(gasUsed, builder.AllocateInstruction().
+			AsIconst64(gasCost).
+			Insert(builder).
+			Return()).
+		Insert(builder).
+		Return()
+
+	c.performGasCheck(newGasUsed)
+}
+
+func (c *Compiler) injectGasMeteringAtFunctionEntry() {
+	if c.loweringState.unreachable {
+		return
+	}
+
+	// Initialize gas state at function entry
+	builder := c.ssaBuilder
+
+	// Load initial gas used
+	initialGasUsed := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, wazevoapi.ExecutionContextOffsetGasUsed.U32(), ssa.TypeI64).
+		Insert(builder).
+		Return()
+
+	// Add base cost for function entry
+	functionEntryCost := uint64(GasCostCall) // or whatever base cost you want for function entry
+	newGasUsed := builder.AllocateInstruction().
+		AsIadd(initialGasUsed, builder.AllocateInstruction().
+			AsIconst64(functionEntryCost).
+			Insert(builder).
+			Return()).
+		Insert(builder).
+		Return()
+
+	c.performGasCheck(newGasUsed)
+}
+
+func (c *Compiler) performGasCheck(newGasUsed ssa.Value) {
+	builder := c.ssaBuilder
+
+	// Load gas limit for initial check
+	gasLimit := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, wazevoapi.ExecutionContextOffsetGasLimit.U32(), ssa.TypeI64).
+		Insert(builder).
+		Return()
+
+	// Compare if we have enough gas to start the function
+	cmp := builder.AllocateInstruction().
+		AsIcmp(newGasUsed, gasLimit, ssa.IntegerCmpCondUnsignedGreaterThan).
+		Insert(builder).
+		Return()
+
+	// Exit if we're out of gas
+	exitInst := builder.AllocateInstruction()
+	exitInst.AsExitIfTrueWithCode(
+		c.execCtxPtrValue,
+		cmp,
+		wazevoapi.ExitCodeOutOfGas,
+	)
+	builder.InsertInstruction(exitInst)
+
+	// Store updated gas used
+	builder.AllocateInstruction().
+		AsStore(ssa.OpcodeStore, newGasUsed, c.execCtxPtrValue, wazevoapi.ExecutionContextOffsetGasUsed.U32()).
 		Insert(builder)
 }

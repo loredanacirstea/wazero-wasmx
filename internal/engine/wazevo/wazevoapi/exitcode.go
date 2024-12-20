@@ -30,6 +30,7 @@ const (
 	ExitCodeMemoryWait64
 	ExitCodeMemoryNotify
 	ExitCodeUnalignedAtomic
+	ExitCodeOutOfGas
 	exitCodeMax
 )
 
@@ -86,6 +87,8 @@ func (e ExitCode) String() string {
 		return "memory_wait64"
 	case ExitCodeMemoryNotify:
 		return "memory_notify"
+	case ExitCodeOutOfGas:
+		return "out_of_gas"
 	}
 	panic("TODO")
 }

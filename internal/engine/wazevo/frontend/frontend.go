@@ -66,6 +66,12 @@ type Compiler struct {
 
 	pointers []int
 	bounds   [][]knownSafeBoundWithID
+
+	// // Gas metering related fields
+	// gasLimitOffset uint32        // Offset in execution context where gas limit is stored
+	// gasUsedOffset  uint32        // Offset in execution context where gas used is stored
+	// outOfGasSig    ssa.Signature // Signature for out of gas handler
+
 }
 
 type (
@@ -564,4 +570,28 @@ func (c *Compiler) getKnownSafeBoundsAtTheEndOfBlocks(id ssa.BasicBlockID) known
 		return knownSafeBoundsAtTheEndOfBlockNil
 	}
 	return c.knownSafeBoundsAtTheEndOfBlocks[id]
+}
+
+// Gas costs for different operation types
+const (
+	GasCostBase      uint64 = 1
+	GasCostMemoryOp  uint64 = 3
+	GasCostCall      uint64 = 5
+	GasCostBranching uint64 = 2
+)
+
+// getGasCost returns the gas cost for a given WebAssembly opcode
+func (c *Compiler) getGasCost(_ wasm.Opcode) uint64 {
+	return 1
+	// switch op {
+	// case wasm.OpcodeCall, wasm.OpcodeCallIndirect:
+	// 	return GasCostCall
+	// case wasm.OpcodeI32Load, wasm.OpcodeI64Load, wasm.OpcodeF32Load, wasm.OpcodeF64Load,
+	// 	wasm.OpcodeI32Store, wasm.OpcodeI64Store, wasm.OpcodeF32Store, wasm.OpcodeF64Store:
+	// 	return GasCostMemoryOp
+	// case wasm.OpcodeBr, wasm.OpcodeBrIf, wasm.OpcodeBrTable:
+	// 	return GasCostBranching
+	// default:
+	// 	return GasCostBase
+	// }
 }
