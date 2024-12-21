@@ -9,11 +9,17 @@
 
 package wazero
 
-import "github.com/tetratelabs/wazero/internal/platform"
+import (
+	"github.com/tetratelabs/wazero/internal/platform"
+)
 
 func newRuntimeConfig() RuntimeConfig {
 	if platform.CompilerSupported() {
 		return NewRuntimeConfigCompiler()
 	}
 	return NewRuntimeConfigInterpreter()
+}
+
+func CompilerSupported() bool {
+	return platform.CompilerSupported()
 }
