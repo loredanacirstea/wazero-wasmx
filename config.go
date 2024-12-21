@@ -172,6 +172,10 @@ type RuntimeConfig interface {
 	WithCloseOnContextDone(bool) RuntimeConfig
 }
 
+func CompilerSupported() bool {
+	return platform.CompilerSupported()
+}
+
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
 // or the interpreter otherwise.
 func NewRuntimeConfig() RuntimeConfig {

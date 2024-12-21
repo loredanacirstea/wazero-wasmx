@@ -19,7 +19,3 @@ func newRuntimeConfig() RuntimeConfig {
 	}
 	return NewRuntimeConfigInterpreter()
 }
-
-func CompilerSupported() bool {
-	return platform.CompilerSupported()
-}
