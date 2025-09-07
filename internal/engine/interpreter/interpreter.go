@@ -405,8 +405,8 @@ func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Mod
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (e *engine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (*wasm.Module, bool, error) {
-	return nil, false, fmt.Errorf("not implemented")
+func (e *engine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (bool, error) {
+	return false, fmt.Errorf("not implemented")
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.

@@ -891,19 +891,26 @@ func (e *engine) CompileModuleAndSerialize(ctx context.Context, module *wasm.Mod
 	return serialized, nil
 }
 
-func (e *engine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (*wasm.Module, bool, error) {
+// built from func (e *engine) CompileModule
+func (e *engine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (bool, error) {
 	if wazevoapi.PerfMapEnabled {
 		wazevoapi.PerfMap.Lock()
 		defer wazevoapi.PerfMap.Unlock()
 	}
+
+	_, ok := e.getCompiledModuleFromMemory(module)
+	if ok {
+		return false, nil
+	}
+
 	// Deserialize the compiled module
 	_, staleCache, err := e.DeserializeCompiledModule(e.wazeroVersion, module, reader, listeners, ensureTermination)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 	if staleCache {
-		return nil, true, nil
+		return true, nil
 	}
 
-	return module, false, nil
+	return false, nil
 }

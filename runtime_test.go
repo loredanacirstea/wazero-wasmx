@@ -793,8 +793,8 @@ func (e *mockEngine) CompileModuleAndSerialize(ctx context.Context, module *wasm
 	return nil, nil
 }
 
-func (e *mockEngine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (cm *wasm.Module, staleCache bool, err error) {
-	return nil, false, nil
+func (e *mockEngine) DeserializeModule(ctx context.Context, module *wasm.Module, reader io.ReadCloser, listeners []experimental.FunctionListener, ensureTermination bool) (staleCache bool, err error) {
+	return false, nil
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.

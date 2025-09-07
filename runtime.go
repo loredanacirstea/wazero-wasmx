@@ -477,11 +477,8 @@ func (r *runtime) CompileModuleAndSerialize(ctx context.Context, binary []byte, 
 }
 
 // DeserializeCompiledModule takes a serialized compiled module and prepares it for instantiation.
-func (r *runtime) DeserializeCompiledModule(ctx context.Context, binary []byte, content io.ReadCloser) (CompiledModule, error) {
-	if err := r.failIfClosed(); err != nil {
-		return nil, err
-	}
-
+// built from runtime.CompileModule
+func (r *runtime) DeserializeCompiledModule(ctx context.Context, binary []byte, aotBinary io.ReadCloser) (CompiledModule, error) {
 	if err := r.failIfClosed(); err != nil {
 		return nil, err
 	}
@@ -500,14 +497,11 @@ func (r *runtime) DeserializeCompiledModule(ctx context.Context, binary []byte, 
 	// TODO: lazy initialization of memory definition.
 	internal.BuildMemoryDefinitions()
 
-	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
-
 	// typeIDs are static and compile-time known.
 	typeIDs, err := r.store.GetFunctionTypeIDs(internal.TypeSection)
 	if err != nil {
 		return nil, err
 	}
-	c.typeIDs = typeIDs
 
 	listeners, err := buildFunctionListeners(ctx, internal)
 	if err != nil {
@@ -516,7 +510,7 @@ func (r *runtime) DeserializeCompiledModule(ctx context.Context, binary []byte, 
 	internal.AssignModuleID(binary, listeners, r.ensureTermination)
 
 	// Deserialize and store the compiled module in the engine's state
-	_, staleCache, err := r.store.Engine.DeserializeModule(ctx, internal, content, listeners, r.ensureTermination)
+	staleCache, err := r.store.Engine.DeserializeModule(ctx, internal, aotBinary, listeners, r.ensureTermination)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize compiled module: %w", err)
 	}

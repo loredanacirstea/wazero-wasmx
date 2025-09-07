@@ -311,7 +311,7 @@ func (e *engine) DeserializeCompiledModule(wazeroVersion string, module *wasm.Mo
 	if staleCache {
 		return nil, true, nil
 	}
-	// taken from getCompiledModule
+	// taken from getCompiledModule -> getCompiledModuleFromCache
 	cm.parent = e
 	cm.module = module
 	cm.sharedFunctions = e.sharedFunctions
